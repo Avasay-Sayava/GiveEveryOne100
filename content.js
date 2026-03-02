@@ -1,43 +1,50 @@
-let checkInterval = null;
+let domObserver = null;
+let isExtensionActive = false;
 
-function executeGrading() {
+function checkAndGrade() {
     const gradeField = document.getElementById("id_grade");
     const saveButton = document.querySelector('button[name="saveandshownext"]');
 
     if (gradeField && saveButton && gradeField.value !== "100") {
-        setTimeout(() => {
-            gradeField.value = "100";
-            saveButton.click();
-        }, 1000);
+        gradeField.value = "100";
+        saveButton.click();
     }
 }
 
-function startLoop() {
-    if (!checkInterval) {
-        checkInterval = setInterval(executeGrading, 1500);
-    }
-    executeGrading();
+function setupObserver() {
+    if (domObserver) domObserver.disconnect();
+
+    domObserver = new MutationObserver(() => {
+        if (isExtensionActive) {
+            checkAndGrade();
+        }
+    });
+
+    domObserver.observe(document.body, { childList: true, subtree: true, attributes: true });
+    checkAndGrade();
 }
 
-function stopLoop() {
-    if (checkInterval) {
-        clearInterval(checkInterval);
-        checkInterval = null;
+function stopObserver() {
+    if (domObserver) {
+        domObserver.disconnect();
+        domObserver = null;
     }
 }
 
 browser.runtime.onMessage.addListener((message) => {
     if (message.command === "toggle") {
-        if (message.state) {
-            startLoop();
+        isExtensionActive = message.state;
+        if (isExtensionActive) {
+            setupObserver();
         } else {
-            stopLoop();
+            stopObserver();
         }
     }
 });
 
 browser.storage.local.get("autoGrade").then((result) => {
-    if (result.autoGrade) {
-        startLoop();
+    isExtensionActive = !!result.autoGrade;
+    if (isExtensionActive) {
+        setupObserver();
     }
 });
